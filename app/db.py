@@ -30,6 +30,15 @@ CREATE TABLE IF NOT EXISTS deals (
 );
 CREATE INDEX IF NOT EXISTS idx_deals_status ON deals(status);
 CREATE INDEX IF NOT EXISTS idx_deals_profit ON deals(profit_estimate);
+
+CREATE TABLE IF NOT EXISTS games (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    platform TEXT NOT NULL,
+    cex_cash_price REAL NOT NULL,
+    updated_at TEXT NOT NULL,
+    UNIQUE(title, platform)
+);
 """
 
 # Columnas añadidas después de la primera versión: si la base de datos ya
@@ -158,6 +167,34 @@ def summary():
                FROM deals"""
         ).fetchone()
         return dict(row)
+
+
+def upsert_game(title: str, platform: str, cex_cash_price: float):
+    now = datetime.utcnow().isoformat()
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT INTO games (title, platform, cex_cash_price, updated_at)
+               VALUES (?, ?, ?, ?)
+               ON CONFLICT(title, platform) DO UPDATE SET
+                 cex_cash_price=excluded.cex_cash_price, updated_at=excluded.updated_at""",
+            (title.strip(), platform, cex_cash_price, now),
+        )
+
+
+def list_games(platform=None):
+    query = "SELECT * FROM games"
+    params = ()
+    if platform:
+        query += " WHERE platform=?"
+        params = (platform,)
+    query += " ORDER BY platform, title"
+    with get_conn() as conn:
+        return [dict(r) for r in conn.execute(query, params).fetchall()]
+
+
+def delete_game(game_id):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM games WHERE id=?", (game_id,))
 
 
 def cumulative_profit_series():

@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Mis juegos - FlipGames{% endblock %}
+{% block content %}
+<p class="pack-note">
+  CEX bloquea las búsquedas automáticas, así que aquí metes tú el precio "pagamos en efectivo"
+  que te da CEX por cada juego (búscalo en <a class="listing-link" href="https://es.webuy.com/" target="_blank" rel="noopener">es.webuy.com</a>).
+  Luego pulsa "Buscar oportunidades reales" en la pestaña Oportunidades y la app busca sola
+  en Vinted y Wallapop el más barato para cada uno.
+</p>
+
+<section class="toolbar">
+  <input id="game-title" type="text" placeholder="Nombre del juego (ej. Mario Kart 8 Deluxe)" class="input-text">
+  <select id="game-platform" class="input-text">
+    <option>Nintendo Switch</option>
+    <option>Nintendo 3DS</option>
+    <option>Nintendo DS</option>
+  </select>
+  <input id="game-price" type="number" step="0.01" min="0" placeholder="Precio CEX efectivo (€)" class="input-text input-small">
+  <button id="btn-add-game" class="btn btn-primary">➕ Añadir</button>
+</section>
+
+<table class="deals-table">
+  <thead>
+    <tr>
+      <th>Juego</th>
+      <th>Plataforma</th>
+      <th>CEX (efectivo)</th>
+      <th>Actualizado</th>
+      <th>Acciones</th>
+    </tr>
+  </thead>
+  <tbody id="games-body">
+    <tr><td colspan="5" class="empty">Cargando...</td></tr>
+  </tbody>
+</table>
+{% endblock %}

@@ -183,7 +183,11 @@ if (scanBtn) {
     status.textContent = "Buscando... esto puede tardar un rato.";
     try {
       const stats = await fetchJSON("/scan", { method: "POST" });
-      status.textContent = `Listo: ${stats.games_checked} juegos revisados, ${stats.deals_found} oportunidades encontradas (${stats.packs_found || 0} packs).`;
+      if (stats.games_checked === 0 && stats.errors && stats.errors.length) {
+        status.textContent = stats.errors[0];
+      } else {
+        status.textContent = `Listo: ${stats.games_checked} juegos revisados, ${stats.deals_found} oportunidades encontradas (${stats.packs_found || 0} packs).`;
+      }
       await refreshAll();
     } catch (e) {
       status.textContent = "Error durante el escaneo, revisa la consola/logs del servidor.";
@@ -201,4 +205,57 @@ if (demoBtn) {
   });
 }
 
+async function loadGames() {
+  const body = document.getElementById("games-body");
+  if (!body) return;
+  const games = await fetchJSON("/api/games");
+  if (games.length === 0) {
+    body.innerHTML = `<tr><td colspan="5" class="empty">Todavía no has añadido ningún juego. Búscalo en es.webuy.com y añade su precio "pagamos en efectivo" arriba.</td></tr>`;
+    return;
+  }
+  body.innerHTML = games.map(g => `
+    <tr>
+      <td>${g.title}</td>
+      <td>${g.platform}</td>
+      <td>${money(g.cex_cash_price)}</td>
+      <td>${g.updated_at ? new Date(g.updated_at).toLocaleDateString("es-ES") : "-"}</td>
+      <td><button class="btn btn-small btn-delete" data-action="delete-game" data-id="${g.id}">Eliminar</button></td>
+    </tr>
+  `).join("");
+}
+
+const addGameBtn = document.getElementById("btn-add-game");
+if (addGameBtn) {
+  addGameBtn.addEventListener("click", async () => {
+    const title = document.getElementById("game-title").value.trim();
+    const platform = document.getElementById("game-platform").value;
+    const price = parseFloat(document.getElementById("game-price").value.replace(",", "."));
+    if (!title || isNaN(price) || price <= 0) {
+      alert("Rellena el nombre del juego y un precio válido.");
+      return;
+    }
+    const resp = await fetch("/api/games", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title, platform, cex_cash_price: price }),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      alert(err.error || "No se pudo añadir el juego");
+      return;
+    }
+    document.getElementById("game-title").value = "";
+    document.getElementById("game-price").value = "";
+    await loadGames();
+  });
+}
+
+document.addEventListener("click", async (ev) => {
+  const btn = ev.target.closest('button[data-action="delete-game"]');
+  if (!btn) return;
+  await fetchJSON(`/games/${btn.dataset.id}/delete`, { method: "POST" });
+  await loadGames();
+});
+
+loadGames();
 refreshAll();

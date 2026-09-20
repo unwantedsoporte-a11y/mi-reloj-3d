@@ -22,6 +22,39 @@ def historial():
     return render_template("historial.html")
 
 
+@app.route("/games")
+def games_page():
+    return render_template("games.html")
+
+
+@app.route("/api/games")
+def api_games():
+    return jsonify(db.list_games())
+
+
+@app.route("/api/games", methods=["POST"])
+def api_games_add():
+    body = request.get_json(force=True, silent=True) or {}
+    title = (body.get("title") or "").strip()
+    platform = (body.get("platform") or "").strip()
+    try:
+        price = float(body.get("cex_cash_price"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "cex_cash_price inválido"}), 400
+    if not title or not platform:
+        return jsonify({"error": "Falta title o platform"}), 400
+    if price <= 0:
+        return jsonify({"error": "El precio debe ser mayor que 0"}), 400
+    db.upsert_game(title, platform, price)
+    return jsonify({"ok": True})
+
+
+@app.route("/games/<int:game_id>/delete", methods=["POST"])
+def api_games_delete(game_id):
+    db.delete_game(game_id)
+    return jsonify({"ok": True})
+
+
 @app.route("/api/deals")
 def api_deals():
     status = request.args.get("status", "pendiente")
