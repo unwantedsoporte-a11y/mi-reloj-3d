@@ -10,16 +10,24 @@ automatizados.
 Requiere, además de `pip install -r requirements.txt`, descargar el
 navegador una sola vez:
     playwright install chromium
+
+Nota técnica: la API "sync" de Playwright solo puede usarse desde el
+mismo hilo (thread) en el que se arrancó — si se llama desde hilos
+distintos (como puede pasar con el servidor de desarrollo de Flask)
+revienta con "greenlet.error: Cannot switch to a different thread". Por
+eso aquí todas las operaciones del navegador se ejecutan siempre dentro
+de un único hilo dedicado, usando un ThreadPoolExecutor de un solo
+worker: pase lo que pase en Flask, Playwright siempre ve el mismo hilo.
 """
 import atexit
 import logging
-import threading
+from concurrent.futures import ThreadPoolExecutor
 
 from app import config
 
 logger = logging.getLogger("flipgames.browser")
 
-_lock = threading.Lock()
+_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="playwright")
 _playwright = None
 _browser = None
 
@@ -29,38 +37,29 @@ class BrowserNotReady(Exception):
 
 
 def _ensure_browser():
+    """Se ejecuta SIEMPRE dentro del hilo dedicado del executor."""
     global _playwright, _browser
     if _browser is not None:
         return _browser
-    with _lock:
-        if _browser is not None:
-            return _browser
-        try:
-            from playwright.sync_api import sync_playwright
-        except ImportError as exc:
-            raise BrowserNotReady(
-                "Falta el paquete 'playwright'. Ejecuta: pip install -r requirements.txt"
-            ) from exc
-        try:
-            _playwright = sync_playwright().start()
-            _browser = _playwright.chromium.launch(headless=True)
-        except Exception as exc:
-            raise BrowserNotReady(
-                "No se pudo arrancar el navegador de Playwright. Ejecuta una vez: "
-                "playwright install chromium — y vuelve a intentarlo. "
-                f"Detalle: {exc}"
-            ) from exc
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as exc:
+        raise BrowserNotReady(
+            "Falta el paquete 'playwright'. Ejecuta: pip install -r requirements.txt"
+        ) from exc
+    try:
+        _playwright = sync_playwright().start()
+        _browser = _playwright.chromium.launch(headless=True)
+    except Exception as exc:
+        raise BrowserNotReady(
+            "No se pudo arrancar el navegador de Playwright. Ejecuta una vez: "
+            "playwright install chromium — y vuelve a intentarlo. "
+            f"Detalle: {exc}"
+        ) from exc
     return _browser
 
 
-def fetch_api_json(page_url: str, url_contains, timeout_ms: int = None):
-    """Abre `page_url` en un navegador real y devuelve el JSON de la primera
-    respuesta cuya URL contenga alguno de los fragmentos de `url_contains`
-    (str o lista de str) — esa es la llamada interna que hace la propia web
-    al cargar los resultados de búsqueda. Devuelve None si no llega a
-    tiempo, la web bloquea la carga, o cualquier otro fallo."""
-    fragments = [url_contains] if isinstance(url_contains, str) else list(url_contains)
-    timeout_ms = timeout_ms or config.BROWSER_TIMEOUT_MS
+def _fetch_in_browser_thread(page_url: str, fragments: list, timeout_ms: int):
     browser = _ensure_browser()
     context = browser.new_context(user_agent=config.USER_AGENT, locale="es-ES")
     page = context.new_page()
@@ -78,7 +77,19 @@ def fetch_api_json(page_url: str, url_contains, timeout_ms: int = None):
         context.close()
 
 
-def shutdown():
+def fetch_api_json(page_url: str, url_contains, timeout_ms: int = None):
+    """Abre `page_url` en un navegador real y devuelve el JSON de la primera
+    respuesta cuya URL contenga alguno de los fragmentos de `url_contains`
+    (str o lista de str) — esa es la llamada interna que hace la propia web
+    al cargar los resultados de búsqueda. Devuelve None si no llega a
+    tiempo, la web bloquea la carga, o cualquier otro fallo."""
+    fragments = [url_contains] if isinstance(url_contains, str) else list(url_contains)
+    timeout_ms = timeout_ms or config.BROWSER_TIMEOUT_MS
+    future = _executor.submit(_fetch_in_browser_thread, page_url, fragments, timeout_ms)
+    return future.result(timeout=(timeout_ms / 1000) + 20)
+
+
+def _shutdown_in_browser_thread():
     global _playwright, _browser
     if _browser:
         try:
@@ -92,6 +103,14 @@ def shutdown():
         except Exception:
             pass
         _playwright = None
+
+
+def shutdown():
+    try:
+        _executor.submit(_shutdown_in_browser_thread).result(timeout=10)
+    except Exception:
+        pass
+    _executor.shutdown(wait=False)
 
 
 atexit.register(shutdown)
