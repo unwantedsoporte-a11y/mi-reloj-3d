@@ -11,6 +11,19 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name
 app = Flask(__name__)
 db.init_db()
 
+_PLATFORM_ALIASES = {
+    "switch": "Nintendo Switch",
+    "nintendo switch": "Nintendo Switch",
+    "3ds": "Nintendo 3DS",
+    "nintendo 3ds": "Nintendo 3DS",
+    "ds": "Nintendo DS",
+    "nintendo ds": "Nintendo DS",
+}
+
+
+def _normalize_platform(raw: str):
+    return _PLATFORM_ALIASES.get((raw or "").strip().lower())
+
 
 @app.route("/")
 def index():
@@ -36,17 +49,53 @@ def api_games():
 def api_games_add():
     body = request.get_json(force=True, silent=True) or {}
     title = (body.get("title") or "").strip()
-    platform = (body.get("platform") or "").strip()
+    platform = _normalize_platform(body.get("platform"))
     try:
         price = float(body.get("cex_cash_price"))
     except (TypeError, ValueError):
         return jsonify({"error": "cex_cash_price inválido"}), 400
     if not title or not platform:
-        return jsonify({"error": "Falta title o platform"}), 400
+        return jsonify({"error": "Falta title o platform (Switch / 3DS / DS)"}), 400
     if price <= 0:
         return jsonify({"error": "El precio debe ser mayor que 0"}), 400
     db.upsert_game(title, platform, price)
     return jsonify({"ok": True})
+
+
+@app.route("/api/games/bulk", methods=["POST"])
+def api_games_bulk():
+    """Añade varios juegos de golpe. Cada línea del texto: 'Título, Plataforma, Precio'."""
+    body = request.get_json(force=True, silent=True) or {}
+    text = body.get("text") or ""
+    added = 0
+    errors = []
+    for i, raw_line in enumerate(text.splitlines(), start=1):
+        line = raw_line.strip()
+        if not line:
+            continue
+        parts = [p.strip() for p in line.split(",")]
+        if len(parts) != 3:
+            errors.append(f"Línea {i}: usa el formato 'Título, Plataforma, Precio' -> {raw_line!r}")
+            continue
+        title, platform_raw, price_raw = parts
+        platform = _normalize_platform(platform_raw)
+        if not title:
+            errors.append(f"Línea {i}: falta el título")
+            continue
+        if not platform:
+            errors.append(f"Línea {i}: plataforma '{platform_raw}' no reconocida (usa Switch, 3DS o DS)")
+            continue
+        try:
+            price = float(price_raw.replace("€", "").replace(",", ".").strip())
+        except ValueError:
+            errors.append(f"Línea {i}: precio '{price_raw}' no válido")
+            continue
+        if price <= 0:
+            errors.append(f"Línea {i}: el precio debe ser mayor que 0")
+            continue
+        db.upsert_game(title, platform, price)
+        added += 1
+    return jsonify({"added": added, "errors": errors})
 
 
 @app.route("/games/<int:game_id>/delete", methods=["POST"])

@@ -257,5 +257,31 @@ document.addEventListener("click", async (ev) => {
   await loadGames();
 });
 
+const bulkAddBtn = document.getElementById("btn-bulk-add");
+if (bulkAddBtn) {
+  bulkAddBtn.addEventListener("click", async () => {
+    const textarea = document.getElementById("bulk-games");
+    const resultEl = document.getElementById("bulk-result");
+    const text = textarea.value.trim();
+    if (!text) return;
+    bulkAddBtn.disabled = true;
+    const result = await fetchJSON("/api/games/bulk", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
+    });
+    bulkAddBtn.disabled = false;
+    let msg = `Añadidos: ${result.added}.`;
+    if (result.errors && result.errors.length) {
+      msg += ` Errores:\n` + result.errors.join("\n");
+    } else {
+      textarea.value = "";
+    }
+    resultEl.textContent = msg;
+    resultEl.style.whiteSpace = "pre-line";
+    await loadGames();
+  });
+}
+
 loadGames();
 refreshAll();

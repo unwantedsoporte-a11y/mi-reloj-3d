@@ -142,4 +142,25 @@ body {
 .input-small { width: 160px; }
 .btn-delete { background: var(--danger); color: white; }
 
+.bulk-add { margin: 20px 0; }
+.bulk-add h3 { font-size: 15px; margin: 0 0 6px; }
+.bulk-example {
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  margin: 6px 0 10px;
+  white-space: pre-wrap;
+}
+.bulk-textarea {
+  display: block;
+  width: 100%;
+  max-width: 520px;
+  font-family: inherit;
+  margin-bottom: 8px;
+  resize: vertical;
+}
+
 a.listing-link { color: var(--accent-2); }

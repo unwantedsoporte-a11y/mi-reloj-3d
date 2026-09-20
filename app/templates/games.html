@@ -19,6 +19,17 @@
   <button id="btn-add-game" class="btn btn-primary">➕ Añadir</button>
 </section>
 
+<section class="bulk-add">
+  <h3>Añadir varios de golpe</h3>
+  <p class="pack-note">Un juego por línea, así: <code>Título, Plataforma, Precio</code> (plataforma: Switch / 3DS / DS). Ejemplo:</p>
+  <pre class="bulk-example">Mario Kart 8 Deluxe, Switch, 35
+Zelda Tears of the Kingdom, Switch, 38
+Mario Kart 7, 3DS, 14</pre>
+  <textarea id="bulk-games" class="input-text bulk-textarea" rows="5" placeholder="Título, Plataforma, Precio"></textarea>
+  <button id="btn-bulk-add" class="btn btn-primary">➕ Añadir todos</button>
+  <div id="bulk-result" class="scan-status"></div>
+</section>
+
 <table class="deals-table">
   <thead>
     <tr>
