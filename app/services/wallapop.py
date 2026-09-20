@@ -1,36 +1,35 @@
-"""Cliente para Wallapop: busca anuncios de un juego y extrae precio/moneda/
-ubicación. Usa el endpoint JSON interno de búsqueda de Wallapop (no es una
-API pública documentada, puede cambiar).
-"""
+"""Cliente para Wallapop: abre la página de búsqueda real en un navegador
+(Playwright) y captura la respuesta JSON que la propia web pide para
+mostrar los resultados. Wallapop bloquea (403) las peticiones directas a
+su API sin pasar por un navegador real, por eso se hace así."""
 import logging
+from urllib.parse import quote
 
 from app import config
-from app.services.http_utils import get_session, polite_sleep, dig
+from app.services import browser
+from app.services.http_utils import dig
 
 logger = logging.getLogger("flipgames.wallapop")
 
-SEARCH_URL = "https://api.wallapop.com/api/v3/general/search"
+SEARCH_PAGE_URL = "https://es.wallapop.com/search"
+API_URL_FRAGMENTS = ["/api/v3/general/search", "/api/v3/search"]
 
 
 def search(query: str, limit: int = None):
     limit = limit or config.LISTINGS_PER_GAME
-    session = get_session()
+    page_url = (
+        f"{SEARCH_PAGE_URL}?keywords={quote(query)}"
+        f"&latitude={config.WALLAPOP_LAT}&longitude={config.WALLAPOP_LON}"
+    )
 
     try:
-        resp = session.get(
-            SEARCH_URL,
-            params={
-                "keywords": query,
-                "latitude": config.WALLAPOP_LAT,
-                "longitude": config.WALLAPOP_LON,
-                "order_by": "price_low_to_high",
-            },
-            timeout=config.REQUEST_TIMEOUT,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    except Exception as exc:
-        logger.warning("Fallo consultando Wallapop para %r: %s", query, exc)
+        data = browser.fetch_api_json(page_url, API_URL_FRAGMENTS)
+    except browser.BrowserNotReady as exc:
+        logger.warning("Wallapop: %s", exc)
+        return []
+
+    if data is None:
+        logger.warning("Fallo consultando Wallapop para %r (sin respuesta de la API)", query)
         return []
 
     items = (
@@ -70,5 +69,4 @@ def search(query: str, limit: int = None):
             "raw_description": (item.get("title") or "") + " " + (item.get("description") or ""),
         })
 
-    polite_sleep()
     return results

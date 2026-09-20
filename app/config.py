@@ -24,7 +24,6 @@ PACK_MIN_GAMES = int(os.environ.get("PACK_MIN_GAMES", 2))
 
 # País de CEX a consultar (afecta a la web y a los precios). "es" = España.
 CEX_COUNTRY = os.environ.get("CEX_COUNTRY", "es")
-CEX_SITE_URL = f"https://{CEX_COUNTRY}.webuy.com/"
 
 # Precio mínimo que debe pagar CEX en efectivo para que nos molestemos en mirarlo
 MIN_CEX_CASH_PRICE = float(os.environ.get("MIN_CEX_CASH_PRICE", 3.0))
@@ -34,13 +33,11 @@ MIN_CEX_CASH_PRICE = float(os.environ.get("MIN_CEX_CASH_PRICE", 3.0))
 WALLAPOP_LAT = float(os.environ.get("WALLAPOP_LAT", 40.4168))
 WALLAPOP_LON = float(os.environ.get("WALLAPOP_LON", -3.7038))
 
-# Pausa (segundos) entre peticiones a marketplaces para no ser agresivos
-REQUEST_DELAY = float(os.environ.get("REQUEST_DELAY", 0.8))
-
-# Cabecera User-Agent usada en las peticiones
+# User-Agent que usa el navegador automatizado (Playwright)
 USER_AGENT = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 )
 
-REQUEST_TIMEOUT = 15
+# Tiempo máximo (ms) esperando a que cargue cada página de búsqueda
+BROWSER_TIMEOUT_MS = int(os.environ.get("BROWSER_TIMEOUT_MS", 25000))

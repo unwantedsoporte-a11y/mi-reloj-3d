@@ -1,13 +1,9 @@
-"""Orquesta el escaneo: para cada juego que hayas guardado en "Mis juegos"
-(con su precio en efectivo de CEX metido a mano), busca anuncios en Vinted
-y Wallapop, calcula el beneficio y guarda las oportunidades rentables en
-la base de datos. También busca packs/lotes de varios juegos.
-
-Nota: existe también `run_scan_cex_auto`, que intenta consultar el precio
-de CEX automáticamente. Se deja en el código por si en el futuro CEX deja
-de bloquear las peticiones automáticas, pero AHORA MISMO NO FUNCIONA (su
-web devuelve 403 Forbidden a peticiones que no vienen de un navegador
-real) y no se usa desde la interfaz."""
+"""Orquesta el escaneo: para cada plataforma, busca automáticamente los
+juegos con mejor precio en efectivo en CEX (navegador automatizado) y los
+combina con los que hayas guardado a mano en "Mis juegos". Para cada uno,
+busca anuncios en Vinted y Wallapop (también con navegador automatizado),
+calcula el beneficio y guarda las oportunidades rentables. También busca
+packs/lotes de varios juegos en un mismo anuncio."""
 import logging
 
 from app import config, db
@@ -53,56 +49,52 @@ def _scan_packs(platform, games, stats):
             stats["packs_found"] += 1
 
 
-def run_scan():
-    """Escanea Vinted/Wallapop para todos los juegos guardados en "Mis
-    juegos" (precio de CEX metido a mano por el usuario)."""
-    stats = {"games_checked": 0, "listings_checked": 0, "deals_found": 0, "packs_found": 0, "errors": []}
-
+def _collect_games(platforms):
+    """Junta los juegos encontrados automáticamente en CEX con los que el
+    usuario haya guardado a mano en 'Mis juegos', sin repetir títulos."""
     games_by_platform = {}
+    errors = []
+
+    for platform in platforms:
+        try:
+            games_by_platform[platform] = list(cex.search_platform_games(platform))
+        except Exception as exc:
+            logger.exception("Error buscando en CEX para %s", platform)
+            errors.append(f"CEX/{platform}: {exc}")
+            games_by_platform[platform] = []
+
     for game in db.list_games():
         games_by_platform.setdefault(game["platform"], []).append(game)
 
-    if not games_by_platform:
+    for platform, games in games_by_platform.items():
+        seen = set()
+        unique_games = []
+        for g in games:
+            key = g["title"].strip().lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_games.append(g)
+        games_by_platform[platform] = unique_games
+
+    return games_by_platform, errors
+
+
+def run_scan(platforms=None):
+    platforms = platforms or config.PLATFORMS
+    stats = {"games_checked": 0, "listings_checked": 0, "deals_found": 0, "packs_found": 0, "errors": []}
+
+    games_by_platform, errors = _collect_games(platforms)
+    stats["errors"].extend(errors)
+
+    if not any(games_by_platform.values()):
         stats["errors"].append(
-            "No tienes ningún juego guardado todavía. Ve a 'Mis juegos' y añade "
-            "el nombre, la plataforma y el precio en efectivo de CEX de cada uno."
+            "No se encontró ningún juego (ni en CEX automático ni en 'Mis juegos'). "
+            "Añade alguno a mano en 'Mis juegos' o revisa los errores de arriba."
         )
         return stats
 
     for platform, games in games_by_platform.items():
-        for game in games:
-            stats["games_checked"] += 1
-            query = f"{game['title']} {platform}"
-            listings = _fetch_listings(query, stats)
-
-            for listing in listings:
-                stats["listings_checked"] += 1
-                deal = build_deal(game, listing)
-                if deal is None:
-                    continue
-                db.upsert_deal(deal)
-                stats["deals_found"] += 1
-
-        _scan_packs(platform, games, stats)
-
-    return stats
-
-
-def run_scan_cex_auto(platforms=None):
-    """Versión antigua que intentaba consultar CEX automáticamente.
-    NO FUNCIONA ahora mismo (403 Forbidden), se deja por si CEX cambia su
-    protección anti-bots en el futuro. No se usa desde la interfaz."""
-    platforms = platforms or config.PLATFORMS
-    stats = {"games_checked": 0, "listings_checked": 0, "deals_found": 0, "packs_found": 0, "errors": []}
-
-    for platform in platforms:
-        try:
-            games = cex.search_platform_games(platform)
-        except Exception as exc:
-            logger.exception("Error buscando en CEX para %s", platform)
-            stats["errors"].append(f"CEX/{platform}: {exc}")
-            continue
-
         for game in games:
             stats["games_checked"] += 1
             query = f"{game['title']} {platform}"

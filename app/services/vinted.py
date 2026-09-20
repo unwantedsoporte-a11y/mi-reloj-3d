@@ -1,49 +1,32 @@
-"""Cliente para Vinted: busca anuncios de un juego y extrae precio/moneda/
-ubicación. Usa el endpoint JSON interno del buscador de Vinted (no es una
-API pública documentada, puede cambiar).
-"""
+"""Cliente para Vinted: abre la página de búsqueda real en un navegador
+(Playwright) y captura la respuesta JSON que la propia web pide para
+mostrar los resultados. Vinted bloquea (404) las peticiones directas a su
+API sin pasar por un navegador real, por eso se hace así."""
 import logging
+from urllib.parse import quote
 
 from app import config
-from app.services.http_utils import get_session, polite_sleep, dig
+from app.services import browser
+from app.services.http_utils import dig
 
 logger = logging.getLogger("flipgames.vinted")
 
-HOME_URL = "https://www.vinted.es/"
-SEARCH_URL = "https://www.vinted.es/api/v2/catalog/items"
-
-
-def _ensure_session_cookies(session):
-    """Vinted exige cookies de sesión (anti-bot) antes de aceptar llamadas
-    a la API; las conseguimos visitando la home una vez."""
-    if session.cookies.get("_vinted_fr_session"):
-        return
-    try:
-        session.get(HOME_URL, timeout=config.REQUEST_TIMEOUT)
-    except Exception as exc:
-        logger.warning("No se pudo obtener cookies de Vinted: %s", exc)
+SEARCH_PAGE_URL = "https://www.vinted.es/catalog"
+API_URL_FRAGMENTS = ["/api/v2/catalog/items"]
 
 
 def search(query: str, limit: int = None):
     limit = limit or config.LISTINGS_PER_GAME
-    session = get_session()
-    _ensure_session_cookies(session)
+    page_url = f"{SEARCH_PAGE_URL}?search_text={quote(query)}&order=price_low_to_high"
 
     try:
-        resp = session.get(
-            SEARCH_URL,
-            params={
-                "search_text": query,
-                "order": "price_low_to_high",
-                "per_page": limit,
-                "currency": "EUR",
-            },
-            timeout=config.REQUEST_TIMEOUT,
-        )
-        resp.raise_for_status()
-        data = resp.json()
-    except Exception as exc:
-        logger.warning("Fallo consultando Vinted para %r: %s", query, exc)
+        data = browser.fetch_api_json(page_url, API_URL_FRAGMENTS)
+    except browser.BrowserNotReady as exc:
+        logger.warning("Vinted: %s", exc)
+        return []
+
+    if data is None:
+        logger.warning("Fallo consultando Vinted para %r (sin respuesta de la API)", query)
         return []
 
     items = dig(data, "items", default=[]) or []
@@ -52,7 +35,6 @@ def search(query: str, limit: int = None):
         price = dig(item, "price", "amount", default=None)
         currency = dig(item, "price", "currency_code", default=None)
         if price is None:
-            # algunas versiones de la API devuelven "total_item_price" o "price" plano
             price = dig(item, "total_item_price", "amount", default=None) or item.get("price")
             currency = currency or dig(item, "total_item_price", "currency_code", default=None)
         if price is None:
@@ -76,5 +58,4 @@ def search(query: str, limit: int = None):
             "raw_description": item.get("title") or "",
         })
 
-    polite_sleep()
     return results

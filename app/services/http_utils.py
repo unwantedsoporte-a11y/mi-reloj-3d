@@ -1,38 +1,8 @@
-"""Utilidades HTTP compartidas por los clientes de CEX / Vinted / Wallapop.
-
-Estas webs no ofrecen una API pública oficial y documentada: usamos los
-mismos endpoints JSON que usan sus propias webs/apps (ingeniería inversa
-"suave", muy habitual en herramientas de comparación de precios). Pueden
-cambiar sin aviso, así que todo el parseo es defensivo: si algo falla,
-se registra el error y se sigue con lo demás en vez de reventar el escaneo.
+"""Utilidades compartidas por los clientes de CEX / Vinted / Wallapop para
+parsear las respuestas JSON de forma defensiva: estas webs no ofrecen una
+API pública documentada, así que si algo cambia de nombre o desaparece,
+estas funciones devuelven `default` en vez de reventar el escaneo.
 """
-import logging
-import time
-
-import requests
-
-from app import config
-
-logger = logging.getLogger("flipgames.http")
-
-_session = None
-
-
-def get_session() -> requests.Session:
-    global _session
-    if _session is None:
-        s = requests.Session()
-        s.headers.update({
-            "User-Agent": config.USER_AGENT,
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Language": "es-ES,es;q=0.9,en;q=0.8",
-        })
-        _session = s
-    return _session
-
-
-def polite_sleep():
-    time.sleep(config.REQUEST_DELAY)
 
 
 def dig(obj, *path, default=None):
