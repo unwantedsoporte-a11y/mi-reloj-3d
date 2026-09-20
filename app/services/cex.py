@@ -13,7 +13,7 @@ from app.services.http_utils import get_session, polite_sleep, dig, find_first_m
 
 logger = logging.getLogger("flipgames.cex")
 
-BASE_URL = "https://wss2.cex.uk.webuy.io/v3/boxes"
+BASE_URL = f"https://wss2.cex.{config.CEX_COUNTRY}.webuy.io/v3/boxes"
 
 # CEX usa "Nintendo Switch", "Nintendo DS", "Nintendo 3DS" en el nombre de
 # categoría/título; con esto filtramos accesorios/consolas y nos quedamos
@@ -49,12 +49,25 @@ def _looks_like_game(box: dict, platform: str) -> bool:
     return True
 
 
+def _ensure_session_cookies(session):
+    """CEX bloquea con 403 las peticiones que no parecen venir de un
+    navegador real. Visitamos su web una vez para conseguir cookies de
+    sesión antes de llamar a la API."""
+    if session.cookies.get("_abck") or session.cookies.get("bm_sz"):
+        return
+    try:
+        session.get(config.CEX_SITE_URL, timeout=config.REQUEST_TIMEOUT)
+    except Exception as exc:
+        logger.warning("No se pudo obtener cookies de CEX: %s", exc)
+
+
 def search_platform_games(platform: str, limit: int = None):
     """Devuelve una lista de dicts {title, cex_cash_price, box_id} para una
     plataforma dada (p.ej. 'Nintendo Switch'), ordenados por precio en
     efectivo descendente."""
     limit = limit or config.SCAN_LIMIT_PER_PLATFORM
     session = get_session()
+    _ensure_session_cookies(session)
     games = {}
     page_size = 50
     try:
@@ -67,6 +80,10 @@ def search_platform_games(platform: str, limit: int = None):
                 "sortBy": "cashPrice",
                 "sortOrder": "desc",
                 "inStock": 1,
+            },
+            headers={
+                "Referer": config.CEX_SITE_URL,
+                "Origin": config.CEX_SITE_URL.rstrip("/"),
             },
             timeout=config.REQUEST_TIMEOUT,
         )

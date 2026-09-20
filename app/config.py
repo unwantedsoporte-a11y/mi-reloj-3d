@@ -17,6 +17,10 @@ LISTINGS_PER_GAME = int(os.environ.get("LISTINGS_PER_GAME", 5))
 # Beneficio mínimo (€) para que un "deal" se guarde como oportunidad
 MIN_PROFIT_EUR = float(os.environ.get("MIN_PROFIT_EUR", 2.0))
 
+# País de CEX a consultar (afecta a la web y a los precios). "es" = España.
+CEX_COUNTRY = os.environ.get("CEX_COUNTRY", "es")
+CEX_SITE_URL = f"https://{CEX_COUNTRY}.webuy.com/"
+
 # Precio mínimo que debe pagar CEX en efectivo para que nos molestemos en mirarlo
 MIN_CEX_CASH_PRICE = float(os.environ.get("MIN_CEX_CASH_PRICE", 3.0))
 
