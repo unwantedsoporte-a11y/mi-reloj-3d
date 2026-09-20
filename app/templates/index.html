@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Oportunidades - FlipGames{% endblock %}
+{% block content %}
+<section class="toolbar">
+  <button id="btn-scan" class="btn btn-primary">🔍 Buscar oportunidades reales</button>
+  <button id="btn-demo" class="btn btn-secondary">🧪 Cargar datos de ejemplo</button>
+  <span id="scan-status" class="scan-status"></span>
+</section>
+
+<section class="summary" id="summary-cards"></section>
+
+<section class="filters">
+  <label><input type="radio" name="condition-filter" value="todas" checked> Todas</label>
+  <label><input type="radio" name="condition-filter" value="con_caratula"> Con carátula</label>
+  <label><input type="radio" name="condition-filter" value="sin_caratula"> Sin carátula</label>
+  <label><input type="radio" name="condition-filter" value="sin_confirmar"> Sin confirmar</label>
+</section>
+
+<table class="deals-table">
+  <thead>
+    <tr>
+      <th>Juego</th>
+      <th>Plataforma</th>
+      <th>Estado</th>
+      <th>Origen</th>
+      <th>Precio anuncio</th>
+      <th>Moneda</th>
+      <th>Ubicación</th>
+      <th>CEX (efectivo)</th>
+      <th>Beneficio est.</th>
+      <th>Margen</th>
+      <th>Acciones</th>
+    </tr>
+  </thead>
+  <tbody id="deals-body">
+    <tr><td colspan="11" class="empty">Cargando...</td></tr>
+  </tbody>
+</table>
+
+<template id="ask-message-template">Hola! ¿El precio está en euros (EUR)? ¿Desde qué país envías el paquete? Gracias</template>
+{% endblock %}

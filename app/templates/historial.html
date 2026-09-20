@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Historial - FlipGames{% endblock %}
+{% block content %}
+<section class="summary" id="summary-cards"></section>
+
+<section class="chart-wrap">
+  <canvas id="profit-chart" height="90"></canvas>
+</section>
+
+<table class="deals-table">
+  <thead>
+    <tr>
+      <th>Juego</th>
+      <th>Plataforma</th>
+      <th>Estado</th>
+      <th>Origen</th>
+      <th>Comprado por</th>
+      <th>Venta CEX (efectivo)</th>
+      <th>Beneficio real</th>
+      <th>Fecha compra</th>
+    </tr>
+  </thead>
+  <tbody id="purchases-body">
+    <tr><td colspan="8" class="empty">Cargando...</td></tr>
+  </tbody>
+</table>
+{% endblock %}

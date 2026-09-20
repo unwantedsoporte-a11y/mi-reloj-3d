@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+flipgames.db
+*.db
+.env
