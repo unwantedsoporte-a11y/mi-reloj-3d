@@ -14,6 +14,7 @@
   <label><input type="radio" name="condition-filter" value="con_caratula"> Con carátula</label>
   <label><input type="radio" name="condition-filter" value="sin_caratula"> Sin carátula</label>
   <label><input type="radio" name="condition-filter" value="sin_confirmar"> Sin confirmar</label>
+  <label><input type="radio" name="condition-filter" value="packs"> 📦 Solo packs/lotes</label>
 </section>
 
 <table class="deals-table">
@@ -36,6 +37,7 @@
     <tr><td colspan="11" class="empty">Cargando...</td></tr>
   </tbody>
 </table>
+<p class="pack-note">📦 = anuncio detectado como lote de varios juegos. La detección es automática por texto del anuncio, así que <strong>revisa siempre el anuncio real</strong> antes de comprar para confirmar qué juegos incluye de verdad.</p>
 
 <template id="ask-message-template">Hola! ¿El precio está en euros (EUR)? ¿Desde qué país envías el paquete? Gracias</template>
 {% endblock %}

@@ -24,11 +24,21 @@ CREATE TABLE IF NOT EXISTS deals (
     bought_profit REAL,
     found_at TEXT NOT NULL,
     bought_at TEXT,
+    is_pack INTEGER NOT NULL DEFAULT 0,
+    matched_titles TEXT,                                -- juegos detectados dentro del pack, separados por " | "
     UNIQUE(title, platform, source, listing_url)
 );
 CREATE INDEX IF NOT EXISTS idx_deals_status ON deals(status);
 CREATE INDEX IF NOT EXISTS idx_deals_profit ON deals(profit_estimate);
 """
+
+# Columnas añadidas después de la primera versión: si la base de datos ya
+# existía (creada antes de que existiera esta columna), hay que agregarlas
+# a mano porque SQLite no las crea solo con CREATE TABLE IF NOT EXISTS.
+_MIGRATIONS = [
+    ("is_pack", "INTEGER NOT NULL DEFAULT 0"),
+    ("matched_titles", "TEXT"),
+]
 
 
 @contextmanager
@@ -46,6 +56,10 @@ def get_conn():
 def init_db():
     with get_conn() as conn:
         conn.executescript(SCHEMA)
+        existing_cols = {row["name"] for row in conn.execute("PRAGMA table_info(deals)")}
+        for col_name, col_def in _MIGRATIONS:
+            if col_name not in existing_cols:
+                conn.execute(f"ALTER TABLE deals ADD COLUMN {col_name} {col_def}")
 
 
 def upsert_deal(deal: dict):
@@ -60,28 +74,31 @@ def upsert_deal(deal: dict):
         row = cur.fetchone()
         if row and row["status"] != "pendiente":
             return row["id"]  # no tocar deals ya comprados/descartados
+        is_pack = int(deal.get("is_pack", False))
+        matched_titles = deal.get("matched_titles")
         if row:
             conn.execute(
                 """UPDATE deals SET listing_price=?, currency_status=?, seller_location=?,
-                   cex_cash_price=?, profit_estimate=?, margin_pct=?, condition=?, found_at=?
+                   cex_cash_price=?, profit_estimate=?, margin_pct=?, condition=?, found_at=?,
+                   is_pack=?, matched_titles=?
                    WHERE id=?""",
                 (
                     deal["listing_price"], deal["currency_status"], deal["seller_location"],
                     deal["cex_cash_price"], deal["profit_estimate"], deal["margin_pct"],
-                    deal["condition"], now, row["id"],
+                    deal["condition"], now, is_pack, matched_titles, row["id"],
                 ),
             )
             return row["id"]
         cur = conn.execute(
             """INSERT INTO deals (title, platform, condition, source, listing_url, listing_price,
                currency_status, seller_location, cex_cash_price, profit_estimate, margin_pct,
-               status, found_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', ?)""",
+               status, found_at, is_pack, matched_titles)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pendiente', ?, ?, ?)""",
             (
                 deal["title"], deal["platform"], deal["condition"], deal["source"],
                 deal["listing_url"], deal["listing_price"], deal["currency_status"],
                 deal["seller_location"], deal["cex_cash_price"], deal["profit_estimate"],
-                deal["margin_pct"], now,
+                deal["margin_pct"], now, is_pack, matched_titles,
             ),
         )
         return cur.lastrowid

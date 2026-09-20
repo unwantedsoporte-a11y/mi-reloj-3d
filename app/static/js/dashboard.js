@@ -37,7 +37,9 @@ async function loadDeals() {
   if (!body) return;
   const deals = await fetchJSON("/api/deals?status=pendiente");
   const filter = currentConditionFilter();
-  const filtered = filter === "todas" ? deals : deals.filter(d => d.condition === filter);
+  const filtered = filter === "todas" ? deals
+    : filter === "packs" ? deals.filter(d => d.is_pack)
+    : deals.filter(d => d.condition === filter);
 
   if (filtered.length === 0) {
     body.innerHTML = `<tr><td colspan="11" class="empty">No hay oportunidades todavía. Pulsa "Buscar oportunidades reales" o carga los datos de ejemplo.</td></tr>`;
@@ -46,7 +48,7 @@ async function loadDeals() {
 
   body.innerHTML = filtered.map(d => `
     <tr data-id="${d.id}">
-      <td>${d.title}</td>
+      <td>${d.is_pack ? "📦 " : ""}${d.title}${d.is_pack && d.matched_titles ? `<div class="pack-contents">Contiene: ${d.matched_titles.split(" | ").join(", ")}</div>` : ""}</td>
       <td>${d.platform}</td>
       <td>${conditionBadge(d.condition)}</td>
       <td>${d.source}</td>
@@ -181,7 +183,7 @@ if (scanBtn) {
     status.textContent = "Buscando... esto puede tardar un rato.";
     try {
       const stats = await fetchJSON("/scan", { method: "POST" });
-      status.textContent = `Listo: ${stats.games_checked} juegos revisados, ${stats.deals_found} oportunidades encontradas.`;
+      status.textContent = `Listo: ${stats.games_checked} juegos revisados, ${stats.deals_found} oportunidades encontradas (${stats.packs_found || 0} packs).`;
       await refreshAll();
     } catch (e) {
       status.textContent = "Error durante el escaneo, revisa la consola/logs del servidor.";
