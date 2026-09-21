@@ -73,7 +73,9 @@ def init_db():
 
 def upsert_deal(deal: dict):
     """Inserta un deal nuevo o actualiza el precio/beneficio si ya existía
-    (mismo título+plataforma+origen+url) y sigue pendiente."""
+    (mismo título+plataforma+origen+url) y sigue pendiente. Devuelve
+    (id, is_new) para que quien llame sepa si era de verdad un hallazgo
+    nuevo o solo estaba refrescando uno que ya se tenía."""
     now = datetime.utcnow().isoformat()
     with get_conn() as conn:
         cur = conn.execute(
@@ -82,7 +84,7 @@ def upsert_deal(deal: dict):
         )
         row = cur.fetchone()
         if row and row["status"] != "pendiente":
-            return row["id"]  # no tocar deals ya comprados/descartados
+            return row["id"], False  # no tocar deals ya comprados/descartados
         is_pack = int(deal.get("is_pack", False))
         matched_titles = deal.get("matched_titles")
         if row:
@@ -97,7 +99,7 @@ def upsert_deal(deal: dict):
                     deal["condition"], now, is_pack, matched_titles, row["id"],
                 ),
             )
-            return row["id"]
+            return row["id"], False
         cur = conn.execute(
             """INSERT INTO deals (title, platform, condition, source, listing_url, listing_price,
                currency_status, seller_location, cex_cash_price, profit_estimate, margin_pct,
@@ -110,7 +112,7 @@ def upsert_deal(deal: dict):
                 deal["margin_pct"], now, is_pack, matched_titles,
             ),
         )
-        return cur.lastrowid
+        return cur.lastrowid, True
 
 
 def list_deals(status=None, order_by="profit_estimate DESC"):

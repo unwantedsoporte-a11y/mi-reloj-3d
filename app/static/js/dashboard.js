@@ -186,7 +186,7 @@ if (scanBtn) {
       if (stats.games_checked === 0 && stats.errors && stats.errors.length) {
         status.textContent = stats.errors[0];
       } else {
-        status.textContent = `Listo: ${stats.games_checked} juegos revisados, ${stats.deals_found} oportunidades encontradas (${stats.packs_found || 0} packs).`;
+        status.textContent = `Listo: ${stats.games_checked} juegos revisados, ${stats.deals_found} oportunidades NUEVAS (${stats.packs_found || 0} packs). Las que ya tenías de antes no se cuentan de nuevo.`;
       }
       await refreshAll();
     } catch (e) {

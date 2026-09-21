@@ -68,9 +68,10 @@ def _scan_packs(platform, games, stats):
             deal = build_pack_deal(matched, listing, platform)
             if deal is None:
                 continue
-            db.upsert_deal(deal)
-            stats["deals_found"] += 1
-            stats["packs_found"] += 1
+            _, is_new = db.upsert_deal(deal)
+            if is_new:
+                stats["deals_found"] += 1
+                stats["packs_found"] += 1
 
 
 def _collect_games(platforms):
@@ -129,8 +130,9 @@ def run_scan(platforms=None):
                 deal = build_deal(game, listing)
                 if deal is None:
                     continue
-                db.upsert_deal(deal)
-                stats["deals_found"] += 1
+                _, is_new = db.upsert_deal(deal)
+                if is_new:
+                    stats["deals_found"] += 1
 
         _scan_packs(platform, games, stats)
 
