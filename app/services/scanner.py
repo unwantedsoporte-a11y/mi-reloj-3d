@@ -38,6 +38,8 @@ def _search_query(title: str, platform: str) -> str:
 def _fetch_listings(query, stats):
     listings = []
     for fetcher, name in ((vinted.search, "vinted"), (wallapop.search, "wallapop")):
+        if name not in config.ENABLED_SOURCES:
+            continue
         try:
             listings += fetcher(query)
         except Exception as exc:

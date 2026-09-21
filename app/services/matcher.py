@@ -20,6 +20,26 @@ _SIN_CARATULA_WORDS = (
     "sin carátula", "sin caratula",
 )
 
+# Anuncios que venden SOLO la caja/manual, sin el cartucho — no es un juego
+# de verdad (no hay nada que revender a CEX), así que se descartan del todo
+# más abajo en build_deal/build_pack_deal. Solo cuentan si NO se menciona
+# también el cartucho en el mismo texto (para no descartar por error un
+# anuncio "completo: caja + manual + cartucho").
+_BOX_ONLY_WORDS = (
+    "sin cartucho", "sin el cartucho", "sin juego", "sin el juego",
+    "solo caja", "solo la caja", "solo manual", "solo el manual",
+    "caja vacia", "caja vacía", "caja+manual", "caja + manual", "caja y manual",
+    "solo caratula", "solo carátula",
+)
+_CARTRIDGE_MENTIONED_WORDS = ("cartucho", "completo", "cib", "juego incluido")
+
+# Importaciones de otras regiones: CEX paga por versiones PAL/España, no por
+# imports (y en 3DS/Switch ni siquiera funcionarían por el bloqueo regional).
+_IMPORT_WORDS_RE = re.compile(
+    r"\b(jpn|jap|japones|japonés|japon|japan|ntsc-?j|ntsc-?u|usa import|us version|import)\b",
+    re.IGNORECASE,
+)
+
 
 def classify_condition(text: str) -> str:
     text = (text or "").lower()
@@ -30,12 +50,30 @@ def classify_condition(text: str) -> str:
     return "sin_confirmar"
 
 
+def is_box_only(text: str) -> bool:
+    """True si el anuncio vende solo la caja/manual sin el cartucho (no hay
+    juego de verdad que revender)."""
+    norm = (text or "").lower()
+    if any(w in norm for w in _CARTRIDGE_MENTIONED_WORDS):
+        return False
+    return any(w in norm for w in _BOX_ONLY_WORDS)
+
+
+def is_import(text: str) -> bool:
+    """True si el anuncio parece ser una versión importada (JPN/USA...) en
+    vez de la versión PAL/España que compraría CEX."""
+    return bool(_IMPORT_WORDS_RE.search(text or ""))
+
+
 def build_deal(game: dict, listing: dict) -> Optional[dict]:
     """Combina un juego (con su precio en efectivo de CEX) con un anuncio de
     marketplace, y calcula el beneficio estimado. Devuelve None si no es
     rentable (por debajo del umbral configurado)."""
     price = listing["listing_price"]
     if price <= 0:
+        return None
+    text = listing.get("raw_description") or listing["title"]
+    if is_box_only(text) or is_import(text):
         return None
     profit = round(game["cex_cash_price"] - price, 2)
     if profit < config.MIN_PROFIT_EUR:
@@ -45,7 +83,7 @@ def build_deal(game: dict, listing: dict) -> Optional[dict]:
     return {
         "title": game["title"],
         "platform": game["platform"],
-        "condition": classify_condition(listing.get("raw_description") or listing["title"]),
+        "condition": classify_condition(text),
         "source": listing["source"],
         "listing_url": listing["listing_url"],
         "listing_price": price,
@@ -97,6 +135,9 @@ def build_pack_deal(matched_games: List[dict], listing: dict, platform: str) -> 
     price = listing["listing_price"]
     if price <= 0 or len(matched_games) < config.PACK_MIN_GAMES:
         return None
+    text = listing.get("raw_description") or listing["title"]
+    if is_box_only(text) or is_import(text):
+        return None
     total_cex = sum(g["cex_cash_price"] for g in matched_games)
     profit = round(total_cex - price, 2)
     if profit < config.MIN_PROFIT_EUR:
@@ -109,7 +150,7 @@ def build_pack_deal(matched_games: List[dict], listing: dict, platform: str) -> 
             "…" if len(titles) > 4 else ""
         ),
         "platform": platform,
-        "condition": classify_condition(listing.get("raw_description") or listing["title"]),
+        "condition": classify_condition(text),
         "source": listing["source"],
         "listing_url": listing["listing_url"],
         "listing_price": price,

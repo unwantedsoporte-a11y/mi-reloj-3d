@@ -7,6 +7,12 @@ DB_PATH = os.path.join(BASE_DIR, "flipgames.db")
 # Plataformas que se buscan en CEX / Vinted / Wallapop
 PLATFORMS = ["Nintendo Switch", "Nintendo 3DS", "Nintendo DS"]
 
+# Marketplaces donde buscar anuncios. Vinted está desactivado por defecto:
+# de momento bloquea siempre al navegador automatizado (solo hace perder
+# tiempo esperando su timeout). Vuelve a añadir "vinted" a la lista si
+# quieres reintentarlo.
+ENABLED_SOURCES = os.environ.get("ENABLED_SOURCES", "wallapop").split(",")
+
 # Cuántos juegos por plataforma se consultan en cada escaneo (para no tardar
 # una eternidad ni martillear las webs a lo bestia)
 SCAN_LIMIT_PER_PLATFORM = int(os.environ.get("SCAN_LIMIT_PER_PLATFORM", 25))
