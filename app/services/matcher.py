@@ -65,6 +65,18 @@ def is_import(text: str) -> bool:
     return bool(_IMPORT_WORDS_RE.search(text or ""))
 
 
+_SWITCH2_EDITION_RE = re.compile(r"switch\s*2", re.IGNORECASE)
+
+
+def is_edition_mismatch(game_title: str, listing_text: str) -> bool:
+    """True si CEX tiene fichado el juego como edición especial de Switch 2
+    (más cara) pero el anuncio no menciona esa edición — probablemente es
+    la versión normal de Switch 1, un producto distinto."""
+    if not _SWITCH2_EDITION_RE.search(game_title or ""):
+        return False
+    return not _SWITCH2_EDITION_RE.search(listing_text or "")
+
+
 def build_deal(game: dict, listing: dict) -> Optional[dict]:
     """Combina un juego (con su precio en efectivo de CEX) con un anuncio de
     marketplace, y calcula el beneficio estimado. Devuelve None si no es
@@ -73,7 +85,7 @@ def build_deal(game: dict, listing: dict) -> Optional[dict]:
     if price <= 0:
         return None
     text = listing.get("raw_description") or listing["title"]
-    if is_box_only(text) or is_import(text):
+    if is_box_only(text) or is_import(text) or is_edition_mismatch(game["title"], text):
         return None
     profit = round(game["cex_cash_price"] - price, 2)
     if profit < config.MIN_PROFIT_EUR:
