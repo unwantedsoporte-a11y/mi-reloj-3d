@@ -64,6 +64,14 @@ def search_platform_games(platform: str, limit: int = None):
                 "x-algolia-application-id": ALGOLIA_APP_ID,
             },
             json=payload,
+            headers={
+                "Referer": f"https://{config.CEX_COUNTRY}.webuy.com/",
+                "Origin": f"https://{config.CEX_COUNTRY}.webuy.com",
+                "User-Agent": (
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                    "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
+                ),
+            },
             timeout=REQUEST_TIMEOUT,
         )
         resp.raise_for_status()
