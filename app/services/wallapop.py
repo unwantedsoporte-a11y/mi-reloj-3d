@@ -12,7 +12,7 @@ from app.services.http_utils import dig
 logger = logging.getLogger("flipgames.wallapop")
 
 SEARCH_PAGE_URL = "https://es.wallapop.com/search"
-API_URL_FRAGMENTS = ["/api/v3/general/search", "/api/v3/search"]
+API_URL_FRAGMENTS = ["/api/v3/search/section"]
 
 
 def search(query: str, limit: int = None):
@@ -32,11 +32,7 @@ def search(query: str, limit: int = None):
         logger.warning("Fallo consultando Wallapop para %r (sin respuesta de la API)", query)
         return []
 
-    items = (
-        dig(data, "search_objects", default=None)
-        or dig(data, "data", "section", "payload", "items", default=None)
-        or []
-    )
+    items = dig(data, "data", "section", "items", default=None) or []
     results = []
     for item in items[:limit]:
         price = dig(item, "price", default=None)
