@@ -36,6 +36,17 @@ class BrowserNotReady(Exception):
     pass
 
 
+def _reset_playwright_state():
+    global _playwright, _browser
+    if _playwright is not None:
+        try:
+            _playwright.stop()
+        except Exception:
+            pass
+    _playwright = None
+    _browser = None
+
+
 def _ensure_browser():
     """Se ejecuta SIEMPRE dentro del hilo dedicado del executor."""
     global _playwright, _browser
@@ -47,21 +58,51 @@ def _ensure_browser():
         raise BrowserNotReady(
             "Falta el paquete 'playwright'. Ejecuta: pip install -r requirements.txt"
         ) from exc
-    try:
-        _playwright = sync_playwright().start()
-        _browser = _playwright.chromium.launch(headless=True)
-    except Exception as exc:
-        raise BrowserNotReady(
-            "No se pudo arrancar el navegador de Playwright. Ejecuta una vez: "
-            "playwright install chromium — y vuelve a intentarlo. "
-            f"Detalle: {exc}"
-        ) from exc
-    return _browser
+
+    # Primero intenta con la configuración normal (visible u oculto según
+    # BROWSER_HEADLESS); si falla (p.ej. no hay pantalla disponible), se
+    # limpia el estado y se reintenta una vez en modo oculto como red de
+    # seguridad, en vez de dejar todo roto para las siguientes búsquedas.
+    attempts = [config.BROWSER_HEADLESS]
+    if not config.BROWSER_HEADLESS:
+        attempts.append(True)
+
+    last_error = None
+    for headless in attempts:
+        try:
+            _playwright = sync_playwright().start()
+            _browser = _playwright.chromium.launch(
+                headless=headless,
+                args=["--disable-blink-features=AutomationControlled"],
+            )
+            return _browser
+        except Exception as exc:
+            last_error = exc
+            _reset_playwright_state()
+
+    raise BrowserNotReady(
+        "No se pudo arrancar el navegador de Playwright. Ejecuta una vez: "
+        "playwright install chromium — y vuelve a intentarlo. "
+        f"Detalle: {last_error}"
+    ) from last_error
+
+
+_STEALTH_SCRIPT = """
+Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+window.chrome = { runtime: {} };
+Object.defineProperty(navigator, 'languages', { get: () => ['es-ES', 'es'] });
+Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+"""
 
 
 def _fetch_in_browser_thread(page_url: str, fragments: list, timeout_ms: int):
     browser = _ensure_browser()
-    context = browser.new_context(user_agent=config.USER_AGENT, locale="es-ES")
+    context = browser.new_context(
+        user_agent=config.USER_AGENT,
+        locale="es-ES",
+        viewport={"width": 1366, "height": 850},
+    )
+    context.add_init_script(_STEALTH_SCRIPT)
     page = context.new_page()
     try:
         with page.expect_response(

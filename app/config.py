@@ -40,4 +40,10 @@ USER_AGENT = (
 )
 
 # Tiempo máximo (ms) esperando a que cargue cada página de búsqueda
-BROWSER_TIMEOUT_MS = int(os.environ.get("BROWSER_TIMEOUT_MS", 25000))
+BROWSER_TIMEOUT_MS = int(os.environ.get("BROWSER_TIMEOUT_MS", 30000))
+
+# Si el navegador automatizado se abre visible (False) o invisible (True).
+# Visible tiene más posibilidades de saltarse los bloqueos anti-bots (varias
+# protecciones son mucho más estrictas con navegadores "headless"), a costa
+# de que se abra una ventana de Chrome en tu pantalla durante el escaneo.
+BROWSER_HEADLESS = os.environ.get("BROWSER_HEADLESS", "false").lower() == "true"
