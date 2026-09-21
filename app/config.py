@@ -52,7 +52,9 @@ USER_AGENT = (
 BROWSER_TIMEOUT_MS = int(os.environ.get("BROWSER_TIMEOUT_MS", 15000))
 
 # Si el navegador automatizado se abre visible (False) o invisible (True).
-# Visible tiene más posibilidades de saltarse los bloqueos anti-bots (varias
-# protecciones son mucho más estrictas con navegadores "headless"), a costa
-# de que se abra una ventana de Chrome en tu pantalla durante el escaneo.
-BROWSER_HEADLESS = os.environ.get("BROWSER_HEADLESS", "false").lower() == "true"
+# Wallapop (la única fuente activa ahora mismo) funciona bien en invisible,
+# así que no hace falta que se abran ventanas de Chrome en la pantalla. Si
+# en el futuro reactivas Vinted y vuelve a fallar, prueba a poner esto en
+# "false" — el modo visible tiene más posibilidades de saltarse bloqueos
+# anti-bots, a costa de que se vea una ventana de Chrome abriéndose sola.
+BROWSER_HEADLESS = os.environ.get("BROWSER_HEADLESS", "true").lower() == "true"
