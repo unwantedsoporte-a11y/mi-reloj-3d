@@ -9,7 +9,6 @@ no depende de buscar desde España — por eso NO se descartan aquí los
 anuncios que no estén en EUR, se marcan con currency_status='no_eur' o
 'sin_confirmar' para que el usuario decida en el panel."""
 import logging
-from urllib.parse import quote
 
 from app import config
 from app.services import browser
@@ -17,16 +16,15 @@ from app.services.http_utils import dig
 
 logger = logging.getLogger("flipgames.vinted")
 
-SEARCH_PAGE_URL = "https://www.vinted.es/catalog"
+HOME_URL = "https://www.vinted.es/"
 API_URL_FRAGMENTS = ["/svc-catalogue/items"]
 
 
 def search(query: str, limit: int = None):
     limit = limit or config.LISTINGS_PER_GAME
-    page_url = f"{SEARCH_PAGE_URL}?search_text={quote(query)}&order=price_low_to_high"
 
     try:
-        data = browser.fetch_api_json(page_url, API_URL_FRAGMENTS)
+        data = browser.search_via_typing(HOME_URL, query, API_URL_FRAGMENTS)
     except browser.BrowserNotReady as exc:
         logger.warning("Vinted: %s", exc)
         return []

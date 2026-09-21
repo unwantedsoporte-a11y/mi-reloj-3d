@@ -95,14 +95,19 @@ Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
 """
 
 
-def _fetch_in_browser_thread(page_url: str, fragments: list, timeout_ms: int):
-    browser = _ensure_browser()
+def _new_context(browser):
     context = browser.new_context(
         user_agent=config.USER_AGENT,
         locale="es-ES",
         viewport={"width": 1366, "height": 850},
     )
     context.add_init_script(_STEALTH_SCRIPT)
+    return context
+
+
+def _fetch_in_browser_thread(page_url: str, fragments: list, timeout_ms: int):
+    browser = _ensure_browser()
+    context = _new_context(browser)
     page = context.new_page()
     try:
         with page.expect_response(
@@ -118,6 +123,58 @@ def _fetch_in_browser_thread(page_url: str, fragments: list, timeout_ms: int):
         context.close()
 
 
+# Varias formas de encontrar la caja de búsqueda, se prueban en orden hasta
+# que una encuentre algo (las webs no siempre marcan su buscador igual).
+_SEARCH_BOX_LOCATORS = [
+    lambda page: page.get_by_role("searchbox"),
+    lambda page: page.get_by_role("combobox"),
+    lambda page: page.locator('input[type="search"]'),
+    lambda page: page.locator('input[name*="search" i]'),
+    lambda page: page.locator('input[placeholder*="buscar" i]'),
+]
+
+
+def _search_in_browser_thread(base_url: str, query: str, fragments: list, timeout_ms: int):
+    """Carga `base_url`, escribe `query` en el buscador de la propia página
+    y pulsa Enter — igual que haría una persona — en vez de ir directo a la
+    URL de resultados. Algunas webs solo hacen la llamada JSON que nos
+    interesa cuando buscas así (si vas directo a la URL de resultados, a
+    veces mandan la página ya montada de fábrica, sin esa llamada aparte)."""
+    browser = _ensure_browser()
+    context = _new_context(browser)
+    page = context.new_page()
+    try:
+        page.goto(base_url, timeout=timeout_ms, wait_until="domcontentloaded")
+
+        search_box = None
+        for locator_fn in _SEARCH_BOX_LOCATORS:
+            try:
+                candidate = locator_fn(page)
+                if candidate.count() > 0:
+                    search_box = candidate.first
+                    break
+            except Exception:
+                continue
+
+        if search_box is None:
+            logger.warning("No se encontró la caja de búsqueda en %s", base_url)
+            return None
+
+        with page.expect_response(
+            lambda r: any(f in r.url for f in fragments) and r.status == 200,
+            timeout=timeout_ms,
+        ) as resp_info:
+            search_box.click()
+            search_box.fill(query)
+            search_box.press("Enter")
+        return resp_info.value.json()
+    except Exception as exc:
+        logger.warning("No se pudo capturar respuesta (%s) buscando %r en %s: %s", fragments, query, base_url, exc)
+        return None
+    finally:
+        context.close()
+
+
 def fetch_api_json(page_url: str, url_contains, timeout_ms: int = None):
     """Abre `page_url` en un navegador real y devuelve el JSON de la primera
     respuesta cuya URL contenga alguno de los fragmentos de `url_contains`
@@ -127,6 +184,17 @@ def fetch_api_json(page_url: str, url_contains, timeout_ms: int = None):
     fragments = [url_contains] if isinstance(url_contains, str) else list(url_contains)
     timeout_ms = timeout_ms or config.BROWSER_TIMEOUT_MS
     future = _executor.submit(_fetch_in_browser_thread, page_url, fragments, timeout_ms)
+    return future.result(timeout=(timeout_ms / 1000) + 20)
+
+
+def search_via_typing(base_url: str, query: str, url_contains, timeout_ms: int = None):
+    """Como `fetch_api_json`, pero simulando escribir `query` en el buscador
+    de `base_url` y pulsar Enter, en vez de navegar directo a una URL de
+    resultados. Devuelve None si no encuentra la caja de búsqueda, no llega
+    a tiempo, o cualquier otro fallo."""
+    fragments = [url_contains] if isinstance(url_contains, str) else list(url_contains)
+    timeout_ms = timeout_ms or config.BROWSER_TIMEOUT_MS
+    future = _executor.submit(_search_in_browser_thread, base_url, query, fragments, timeout_ms)
     return future.result(timeout=(timeout_ms / 1000) + 20)
 
 

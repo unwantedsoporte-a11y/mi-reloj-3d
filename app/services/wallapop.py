@@ -3,7 +3,6 @@
 mostrar los resultados. Wallapop bloquea (403) las peticiones directas a
 su API sin pasar por un navegador real, por eso se hace así."""
 import logging
-from urllib.parse import quote
 
 from app import config
 from app.services import browser
@@ -11,19 +10,15 @@ from app.services.http_utils import dig
 
 logger = logging.getLogger("flipgames.wallapop")
 
-SEARCH_PAGE_URL = "https://es.wallapop.com/search"
+HOME_URL = "https://es.wallapop.com/"
 API_URL_FRAGMENTS = ["/api/v3/search/section"]
 
 
 def search(query: str, limit: int = None):
     limit = limit or config.LISTINGS_PER_GAME
-    page_url = (
-        f"{SEARCH_PAGE_URL}?keywords={quote(query)}"
-        f"&latitude={config.WALLAPOP_LAT}&longitude={config.WALLAPOP_LON}"
-    )
 
     try:
-        data = browser.fetch_api_json(page_url, API_URL_FRAGMENTS)
+        data = browser.search_via_typing(HOME_URL, query, API_URL_FRAGMENTS)
     except browser.BrowserNotReady as exc:
         logger.warning("Wallapop: %s", exc)
         return []
