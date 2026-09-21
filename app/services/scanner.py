@@ -5,12 +5,34 @@ busca anuncios en Vinted y Wallapop (también con navegador automatizado),
 calcula el beneficio y guarda las oportunidades rentables. También busca
 packs/lotes de varios juegos en un mismo anuncio."""
 import logging
+import re
 
 from app import config, db
 from app.services import cex, vinted, wallapop
 from app.services.matcher import build_deal, build_pack_deal, find_matching_games, looks_like_pack
 
 logger = logging.getLogger("flipgames.scanner")
+
+# Nombres cortos para las búsquedas: son más parecidos a lo que escribiría
+# una persona de verdad, y evitan repetir "Nintendo Switch" dos veces si el
+# título del juego ya lo menciona.
+_PLATFORM_SHORT = {
+    "Nintendo Switch": "Switch",
+    "Nintendo 3DS": "3DS",
+    "Nintendo DS": "DS",
+}
+
+# CEX añade cosas tipo " - Nintendo Switch 2 Edition" al nombre de algunos
+# juegos; para buscar en marketplaces nos quedamos solo con el título base.
+_EDITION_SUFFIX_RE = re.compile(r"\s*[-–—]\s*.*\b(edition|edici[oó]n)\b.*$", re.IGNORECASE)
+
+
+def _search_query(title: str, platform: str) -> str:
+    clean_title = _EDITION_SUFFIX_RE.sub("", title).strip()
+    short_platform = _PLATFORM_SHORT.get(platform, platform)
+    if short_platform.lower() in clean_title.lower():
+        return clean_title
+    return f"{clean_title} {short_platform}"
 
 
 def _fetch_listings(query, stats):
@@ -97,7 +119,7 @@ def run_scan(platforms=None):
     for platform, games in games_by_platform.items():
         for game in games:
             stats["games_checked"] += 1
-            query = f"{game['title']} {platform}"
+            query = _search_query(game["title"], platform)
             listings = _fetch_listings(query, stats)
 
             for listing in listings:
