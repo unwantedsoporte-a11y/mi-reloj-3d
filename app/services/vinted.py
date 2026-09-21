@@ -1,7 +1,13 @@
 """Cliente para Vinted: abre la página de búsqueda real en un navegador
 (Playwright) y captura la respuesta JSON que la propia web pide para
-mostrar los resultados. Vinted bloquea (404) las peticiones directas a su
-API sin pasar por un navegador real, por eso se hace así."""
+mostrar los resultados (api.vinted.es/svc-catalogue/items). Vinted
+bloquea las peticiones directas sin pasar por un navegador real, por eso
+se hace así.
+
+Nota sobre monedas: cada vendedor pone el precio en la moneda que quiera,
+no depende de buscar desde España — por eso NO se descartan aquí los
+anuncios que no estén en EUR, se marcan con currency_status='no_eur' o
+'sin_confirmar' para que el usuario decida en el panel."""
 import logging
 from urllib.parse import quote
 
@@ -12,7 +18,7 @@ from app.services.http_utils import dig
 logger = logging.getLogger("flipgames.vinted")
 
 SEARCH_PAGE_URL = "https://www.vinted.es/catalog"
-API_URL_FRAGMENTS = ["/api/v2/catalog/items"]
+API_URL_FRAGMENTS = ["/svc-catalogue/items"]
 
 
 def search(query: str, limit: int = None):
@@ -32,11 +38,13 @@ def search(query: str, limit: int = None):
     items = dig(data, "items", default=[]) or []
     results = []
     for item in items[:limit]:
-        price = dig(item, "price", "amount", default=None)
-        currency = dig(item, "price", "currency_code", default=None)
+        # total_item_price = precio + protección al comprador (lo que se paga
+        # de verdad); si no viene, usamos el precio base del artículo.
+        price = dig(item, "total_item_price", "amount", default=None)
+        currency = dig(item, "total_item_price", "currency_code", default=None)
         if price is None:
-            price = dig(item, "total_item_price", "amount", default=None) or item.get("price")
-            currency = currency or dig(item, "total_item_price", "currency_code", default=None)
+            price = dig(item, "price", "amount", default=None)
+            currency = currency or dig(item, "price", "currency_code", default=None)
         if price is None:
             continue
         try:
@@ -46,16 +54,22 @@ def search(query: str, limit: int = None):
 
         currency_status = "eur" if currency == "EUR" else ("sin_confirmar" if not currency else "no_eur")
         item_id = item.get("id")
-        url = item.get("url") or (f"https://www.vinted.es/items/{item_id}" if item_id else None)
+        url_path = item.get("url")
+        if url_path:
+            url = url_path if url_path.startswith("http") else f"https://www.vinted.es{url_path}"
+        else:
+            url = f"https://www.vinted.es/items/{item_id}" if item_id else None
+
+        title = item.get("title") or dig(item, "item_box", "first_line", default=None) or query
 
         results.append({
             "source": "vinted",
-            "title": item.get("title") or query,
+            "title": title,
             "listing_price": price,
             "currency_status": currency_status,
             "seller_location": item.get("city") or dig(item, "user", "city", default=None),
             "listing_url": url,
-            "raw_description": item.get("title") or "",
+            "raw_description": title,
         })
 
     return results
