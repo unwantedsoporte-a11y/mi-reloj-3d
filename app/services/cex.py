@@ -28,7 +28,8 @@ ALGOLIA_INDEX = f"prod_cex_{config.CEX_COUNTRY}"
 REQUEST_TIMEOUT = 15
 
 _EXCLUDE_WORDS = ("console", "consola", "cargador", "charger", "mando", "controller",
-                  "funda", "case", "cable", "adaptador", "adapter", "docking")
+                  "funda", "case", "cable", "adaptador", "adapter", "docking",
+                  "joy-con", "joy con", "joycon")
 
 
 def _looks_like_game(hit: dict) -> bool:
@@ -36,9 +37,12 @@ def _looks_like_game(hit: dict) -> bool:
     category = (hit.get("categoryFriendlyName") or hit.get("categoryName") or "").lower()
     if not name:
         return False
-    if any(word in name for word in _EXCLUDE_WORDS):
+    # la categoría de CEX para juegos siempre incluye la palabra "juegos"
+    # (ej. "Switch Juegos", "3DS Juegos"); si no la tiene, casi seguro es
+    # un accesorio (mando, cargador, funda...) y no un juego.
+    if "juego" not in category and "game" not in category:
         return False
-    if any(word in category for word in ("console", "consola", "hardware", "accesor", "accessor")):
+    if any(word in name for word in _EXCLUDE_WORDS):
         return False
     return True
 

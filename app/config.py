@@ -39,8 +39,11 @@ USER_AGENT = (
     "(KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 )
 
-# Tiempo máximo (ms) esperando a que cargue cada página de búsqueda
-BROWSER_TIMEOUT_MS = int(os.environ.get("BROWSER_TIMEOUT_MS", 30000))
+# Tiempo máximo (ms) esperando a que cargue cada página de búsqueda. Si una
+# fuente empieza a fallar siempre (ej. bloqueo anti-bots), este tiempo se
+# pierde en cada intento — bájalo si prefieres escaneos más rápidos aunque
+# se corte antes una fuente que sí iba a responder tarde.
+BROWSER_TIMEOUT_MS = int(os.environ.get("BROWSER_TIMEOUT_MS", 15000))
 
 # Si el navegador automatizado se abre visible (False) o invisible (True).
 # Visible tiene más posibilidades de saltarse los bloqueos anti-bots (varias
